@@ -3,37 +3,69 @@ import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged }
 import { initializeApp } from 'firebase/app';
 import { getFirestore, doc, setDoc } from 'firebase/firestore';
 
-// --- Local Development Setup for Canvas/Immersive Document Variables ---
-// এই অংশটি শুধুমাত্র লোকাল ডেভেলপমেন্ট এনভায়রনমেন্টের জন্য,
-// যখন Canvas/Immersive Document এনভায়রনমেন্টে চলবে, তখন আসল মানগুলো স্বয়ংক্রিয়ভাবে পাওয়া যাবে।
-if (typeof window.__firebase_config === 'undefined' && process.env.NODE_ENV !== 'production') {
-    // Development mode, define mock global variables for local testing
-    window.__firebase_config = JSON.stringify({
-        apiKey: "YOUR_FIREBASE_API_KEY", // এখানে তোমার Firebase প্রজেক্টের আসল API Key বসাও (যদি লোকালি Firestore টেস্ট করতে চাও)
-        authDomain: "YOUR_FIREBASE_PROJECT_ID.firebaseapp.com",
-        projectId: "YOUR_FIREBASE_PROJECT_ID",
-        storageBucket: "YOUR_FIREBASE_PROJECT_ID.appspot.com",
-        messagingSenderId: "YOUR_MESSAGING_SENDER_ID",
-        appId: "YOUR_APP_ID"
-    });
-    window.__app_id = "mock-app-id";
-    window.__initial_auth_token = "mock-auth-token"; // এই টোকেন লোকাল অথেন্টিকেশনে ব্যবহৃত হয় না
-}
-// --- End Local Development Setup ---
+// --- Firebase & API Key Configuration ---
+// These functions ensure that Firebase configuration and API Key are loaded from the correct source:
+// 1. Canvas global variables (when running in Canvas environment)
+// 2. process.env variables (when running in Vercel or local build environment)
+// 3. Default or empty values (if none are available)
 
+const getFirebaseConfig = () => {
+    // Prioritize Canvas global variables
+    if (typeof window !== 'undefined' && typeof window.__firebase_config !== 'undefined') {
+        try {
+            return JSON.parse(window.__firebase_config);
+        } catch (e) {
+            console.error("Failed to parse window.__firebase_config:", e);
+        }
+    }
+    // Fallback to process.env variables (for Vercel or local build)
+    if (typeof process !== 'undefined' && typeof process.env !== 'undefined' && process.env.REACT_APP_FIREBASE_CONFIG) {
+        try {
+            return JSON.parse(process.env.REACT_APP_FIREBASE_CONFIG);
+        } catch (e) {
+            console.error("Failed to parse process.env.REACT_APP_FIREBASE_CONFIG:", e);
+        }
+    }
+    return {}; // Return empty object if no configuration is found
+};
 
-// Ensure Firebase is initialized and auth is handled
-// 'window.__firebase_config' থেকে কনফিগারেশন নাও
-const firebaseConfig = typeof window.__firebase_config !== 'undefined' ? JSON.parse(window.__firebase_config) : {};
+const firebaseConfig = getFirebaseConfig();
 const app = Object.keys(firebaseConfig).length ? initializeApp(firebaseConfig) : null;
 const auth = app ? getAuth(app) : null;
 const db = app ? getFirestore(app) : null;
 
-// Function to safely get the appId
-const getAppId = () => typeof window.__app_id !== 'undefined' ? window.__app_id : 'default-app-id';
+// Function to get the app ID
+const getAppId = () => {
+    if (typeof window !== 'undefined' && typeof window.__app_id !== 'undefined') {
+        return window.__app_id;
+    }
+    if (typeof process !== 'undefined' && typeof process.env !== 'undefined' && process.env.REACT_APP_APP_ID) {
+        return process.env.REACT_APP_APP_ID;
+    }
+    return 'default-app-id';
+};
 
-// Function to safely get the auth token
-const getAuthToken = () => typeof window.__initial_auth_token !== 'undefined' ? window.__initial_auth_token : null;
+// Function to get the authentication token
+const getAuthToken = () => {
+    if (typeof window !== 'undefined' && typeof window.__initial_auth_token !== 'undefined') {
+        return window.__initial_auth_token;
+    }
+    if (typeof process !== 'undefined' && typeof process.env !== 'undefined' && process.env.REACT_APP_INITIAL_AUTH_TOKEN) {
+        return process.env.REACT_APP_INITIAL_AUTH_TOKEN;
+    }
+    return null;
+};
+
+// Function to get the Gemini API Key
+const getGeminiApiKey = () => {
+    // In the Canvas environment, if the API Key is empty, it's automatically populated.
+    // For Vercel or local builds, it comes from environment variables.
+    if (typeof process !== 'undefined' && typeof process.env !== 'undefined' && process.env.REACT_APP_GEMINI_API_KEY) {
+        return process.env.REACT_APP_GEMINI_API_KEY;
+    }
+    return ""; // Default empty string allows for automatic API Key injection in Canvas
+};
+// --- Firebase & API Key Configuration End ---
 
 
 function App() {
@@ -47,66 +79,61 @@ function App() {
     const [isAuthReady, setIsAuthReady] = useState(false);
 
     useEffect(() => {
-        // এই useEffect টি নিশ্চিত করে যে Firebase Auth প্রস্তুত হয়েছে এবং userId সেট হয়েছে।
-        // এটি Firestore অপারেশন করার আগে প্রয়োজনীয়।
         if (!auth) {
-            console.error("Firebase Auth instance is not available.");
-            // যদি 'auth' অবজেক্ট না থাকে, সম্ভবত Firebase কনফিগারেশন সেটআপ হয়নি।
-            // এই ক্ষেত্রে, Firebase-এর উপর নির্ভরশীল অংশগুলি কাজ করবে না।
+            console.error("Firebase Auth instance is not available. Please check Firebase config.");
+            setError("Application initialization failed.");
             return;
         }
 
         const unsubscribe = onAuthStateChanged(auth, async (user) => {
-            if (!user) { // যদি কোনো ব্যবহারকারী লগইন না থাকে
+            if (!user) { // If no user is logged in
                 try {
                     const token = getAuthToken();
-                    // যদি আসল অথ টোকেন থাকে (mock token না হয়)
-                    if (token && token !== "mock-auth-token") {
+                    if (token) { // If a real token exists (not a mock token)
                         await signInWithCustomToken(auth, token);
-                    } else {
-                        // লোকাল ডেভেলপমেন্টে বা আসল টোকেন না থাকলে অ্যানোনিমাসলি সাইন ইন করো
+                    } else { // Fallback to anonymous sign-in for local development or if no real token
                         await signInAnonymously(auth);
                     }
                 } catch (err) {
                     console.error("Firebase authentication error during sign-in:", err);
-                    setError("Firebase authentication failed. Please check your Firebase setup.");
+                    setError("Firebase authentication failed.");
                 }
             }
-            // ব্যবহারকারীর ID সেট করো, যদি অথেন্টিকেটেড হয় তাহলে UID, অন্যথায় একটি র্যান্ডম ID
+            // Set the user ID; UID if authenticated, otherwise a random ID
             setUserId(auth.currentUser?.uid || crypto.randomUUID());
-            setIsAuthReady(true); // অথেন্টিকেশন প্রক্রিয়া সম্পন্ন হয়েছে নির্দেশ করো
+            setIsAuthReady(true); // Indicate that authentication process is complete
         });
 
-        // কম্পোনেন্ট আনমাউন্ট হলে সাবস্ক্রিপশন বন্ধ করো
+        // Clean up the subscription on component unmount
         return () => unsubscribe();
-    }, [auth]); // 'auth' এখানে একটি প্রয়োজনীয় ডিপেন্ডেন্সি, কারণ useEffect এর ভেতরের লজিক 'auth' অবজেক্টের উপর নির্ভরশীল।
+    }, [auth]); // 'auth' is a necessary dependency here, as the logic inside useEffect depends on the 'auth' object.
 
 
     const handleImageChange = (e) => {
         const file = e.target.files[0];
         if (file) {
-            // ছবির প্রকারভেদ চেক করা
+            // Check image type
             if (!file.type.startsWith('image/')) {
-                setError('শুধুমাত্র ছবি ফাইল আপলোড করুন।');
+                setError('Please upload image files only.');
                 setImage(null);
                 setPreviewUrl(null);
                 return;
             }
-            // ছবির আকার চেক করা (5MB এর বেশি হলে)
+            // Check image size (max 5MB)
             if (file.size > 5 * 1024 * 1024) { // 5MB limit
-                setError('ছবির আকার 5MB এর বেশি হতে পারবে না।');
+                setError('Image size cannot exceed 5MB.');
                 setImage(null);
                 setPreviewUrl(null);
                 return;
             }
 
-            setError(''); // কোনো ত্রুটি থাকলে তা সরিয়ে ফেলো
-            const reader = new FileReader(); // FileReader ব্যবহার করে ছবি পড়ো
+            setError(''); // Clear any errors
+            const reader = new FileReader(); // Use FileReader to read the image
             reader.onloadend = () => {
-                setImage(reader.result); // Base64 স্ট্রিং হিসেবে ছবি সেট করো
-                setPreviewUrl(reader.result); // প্রিভিউ দেখানোর জন্য URL সেট করো
+                setImage(reader.result); // Set image as Base64 string
+                setPreviewUrl(reader.result); // Set URL for preview display
             };
-            reader.readAsDataURL(file); // ছবিটি Base64 Data URL হিসেবে পড়ো
+            reader.readAsDataURL(file); // Read image as Base64 Data URL
         } else {
             setImage(null);
             setPreviewUrl(null);
@@ -114,31 +141,31 @@ function App() {
     };
 
     const handleGenerate = async () => {
-        // ছবি আপলোড না থাকলে জেনারেট করা যাবে না
+        // Cannot generate if no image is uploaded
         if (!image) {
-            setError('অনুগ্রহ করে একটি ছবি আপলোড করুন।');
+            setError('Please upload an image.');
             return;
         }
-        // Firebase Auth এবং Firestore প্রস্তুত না হলে অপেক্ষা করো
+        // Wait if Firebase Auth and Firestore are not ready
         if (!isAuthReady || !userId || !db) {
-            setError('অ্যাপ্লিকেশন প্রস্তুত হচ্ছে, অনুগ্রহ করে একটু অপেক্ষা করুন।');
+            setError('Application is preparing, please wait a moment.');
             console.warn("Firestore not ready or userId not set. isAuthReady:", isAuthReady, "userId:", userId, "db:", db);
             return;
         }
 
-        setLoading(true); // লোডিং স্টেট সেট করো
-        setError(''); // ত্রুটি বার্তা পরিষ্কার করো
-        setTitle(''); // আগের টাইটেল পরিষ্কার করো
-        setKeywords([]); // আগের কিওয়ার্ড পরিষ্কার করো
+        setLoading(true); // Set loading state
+        setError(''); // Clear error message
+        setTitle(''); // Clear previous title
+        setKeywords([]); // Clear previous keywords
 
-        // ছবির MIME টাইপ এবং Base64 ডেটা আলাদা করো
+        // Separate image MIME type and Base64 data
         const imageMimeType = image.substring(image.indexOf(':') + 1, image.indexOf(';'));
-        const base64ImageData = image.split(',')[1]; // "data:image/jpeg;base64," অংশটি বাদ দাও
+        const base64ImageData = image.split(',')[1]; // Remove "data:image/jpeg;base64," prefix
 
-        // Gemini API এর জন্য প্রম্পট তৈরি করো
-        const prompt = `এই ছবিটির উপর ভিত্তি করে, অ্যাডোব স্টকের সাধারণ নির্দেশিকা (যেমন, বর্ণনামূলক, অনন্য, বাজারযোগ্য) অনুসরণ করে একটি ট্রেন্ডি, আকর্ষণীয় শিরোনাম তৈরি করুন। এছাড়াও, ছবির বিষয়বস্তুর সাথে অত্যন্ত প্রাসঙ্গিক প্রায় ৪৫টি একক-শব্দের কিওয়ার্ড দিন। নিশ্চিত করুন যে কিওয়ার্ডগুলি স্বতন্ত্র এবং ছবিতে থাকা মূল উপাদান, ধারণা এবং শৈলীকে উপস্থাপন করে। শুধুমাত্র একক শব্দ ব্যবহার করুন।`;
+        // Create prompt for Gemini API
+        const prompt = `Based on this image, generate a trendy, appealing title following general Adobe Stock guidelines (e.g., descriptive, unique, marketable). Also, provide approximately 45 single-word keywords highly relevant to the image content. Ensure keywords are distinct and represent key elements, concepts, and styles present in the image. Use only single words.`;
 
-        // API কলের জন্য পে-লোড (payload) তৈরি করো
+        // Create payload for API call
         const payload = {
             contents: [
                 {
@@ -170,11 +197,19 @@ function App() {
             }
         };
 
-        const apiKey = ""; // Canvas পরিবেশ এই API Key স্বয়ংক্রিয়ভাবে সরবরাহ করবে
-        const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
+        const geminiApiKey = getGeminiApiKey();
+        // If API Key is not available in Vercel or local production, it will show an error.
+        // In Canvas, it's automatically populated if empty.
+        if (!geminiApiKey) { // Simplified check for API key
+            setError("Gemini API Key is not available. Please set Vercel environment variables.");
+            setLoading(false);
+            return;
+        }
+        const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${geminiApiKey}`;
+
 
         try {
-            // Gemini API কল করো
+            // Call Gemini API
             const response = await fetch(apiUrl, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -182,41 +217,41 @@ function App() {
             });
             const result = await response.json();
 
-            // API রেসপন্স প্রক্রিয়া করো
+            // Process API response
             if (result.candidates && result.candidates.length > 0 &&
                 result.candidates[0].content && result.candidates[0].content.parts &&
                 result.candidates[0].content.parts.length > 0) {
                 const json = result.candidates[0].content.parts[0].text;
                 const parsedJson = JSON.parse(json);
 
-                setTitle(parsedJson.title || ''); // টাইটেল সেট করো
-                setKeywords(Array.isArray(parsedJson.keywords) ? parsedJson.keywords : []); // কিওয়ার্ড সেট করো
+                setTitle(parsedJson.title || ''); // Set title
+                setKeywords(Array.isArray(parsedJson.keywords) ? parsedJson.keywords : []); // Set keywords
 
-                // জেনারেট করা ডেটা Firestore এ সেভ করো
+                // Save generated data to Firestore
                 const appId = getAppId();
-                // প্রাইভেট ডেটার জন্য Firestore পাথ: artifacts/{appId}/users/{userId}/{your_collection_name}
+                // Firestore path for private data: artifacts/{appId}/users/{userId}/{your_collection_name}
                 const userDocRef = doc(db, `artifacts/${appId}/users/${userId}/generated_data`, `data_${Date.now()}`);
                 await setDoc(userDocRef, {
                     timestamp: new Date(),
                     imageMimeType: imageMimeType,
                     title: parsedJson.title || '',
                     keywords: Array.isArray(parsedJson.keywords) ? parsedJson.keywords : [],
-                    userId: userId // ভবিষ্যতে ব্যবহারের জন্য userId সেভ করো
+                    userId: userId
                 });
 
             } else {
-                setError('জেনারেশন ব্যর্থ হয়েছে। অনুগ্রহ করে আবার চেষ্টা করুন।');
+                setError('Generation failed. Please try again.');
                 console.error("Unexpected API response structure:", result);
             }
         } catch (err) {
-            setError('জেনারেশন প্রক্রিয়ায় একটি ত্রুটি হয়েছে: ' + err.message);
+            setError('An error occurred during generation: ' + err.message);
             console.error("API call error:", err);
         } finally {
-            setLoading(false); // লোডিং স্টেট বন্ধ করো
+            setLoading(false); // Stop loading state
         }
     };
 
-    // ক্লিপবোর্ডে কপি করার ফাংশন
+    // Function to copy to clipboard
     const copyToClipboard = (text, type) => {
         const tempTextArea = document.createElement('textarea');
         tempTextArea.value = text;
@@ -224,10 +259,8 @@ function App() {
         tempTextArea.select();
         try {
             document.execCommand('copy');
-            // alert(`${type} কপি করা হয়েছে!`); // কাস্টম মডাল ব্যবহার করা উচিত, তবে এখানে সরলতার জন্য alert ব্যবহার করা হয়েছে
-            // কাস্টম নোটিফিকেশন UI ব্যবহার করতে পারো এখানে alert() এর পরিবর্তে
             const messageBox = document.createElement('div');
-            messageBox.textContent = `${type} কপি করা হয়েছে!`;
+            messageBox.textContent = `${type} copied!`;
             messageBox.style.cssText = `
                 position: fixed;
                 top: 20px;
@@ -244,17 +277,16 @@ function App() {
             document.body.appendChild(messageBox);
             setTimeout(() => {
                 messageBox.style.opacity = '1';
-            }, 10); // Small delay to trigger transition
+            }, 10);
             setTimeout(() => {
                 messageBox.style.opacity = '0';
                 messageBox.addEventListener('transitionend', () => messageBox.remove());
-            }, 2000); // Hide after 2 seconds
+            }, 2000);
 
         } catch (err) {
-            console.error('কপি করতে ব্যর্থ:', err);
-            // alert('কপি করতে ব্যর্থ হয়েছে।');
+            console.error('Failed to copy:', err);
             const messageBox = document.createElement('div');
-            messageBox.textContent = 'কপি করতে ব্যর্থ হয়েছে।';
+            messageBox.textContent = 'Failed to copy.';
             messageBox.style.cssText = `
                 position: fixed;
                 top: 20px;
@@ -282,15 +314,25 @@ function App() {
 
     return (
         <div className="min-h-screen bg-gradient-to-br from-indigo-500 via-purple-500 to-pink-500 font-inter text-gray-100 flex items-center justify-center p-4">
+            {/* Welcome Message Section */}
+            <div className="mb-8 w-full max-w-4xl text-center">
+                <h1 className="text-4xl font-bold text-white drop-shadow-lg animate-fade-in-down">
+                    SHAHADAT HOSSAIN BAPPI welcomes you!
+                </h1>
+                <p className="text-xl text-gray-200 mt-2 animate-fade-in-up">
+                    Discover the power of AI to elevate your image content.
+                </p>
+            </div>
+
             <div className="bg-white bg-opacity-10 backdrop-filter backdrop-blur-lg border border-opacity-20 border-white rounded-xl shadow-2xl p-8 max-w-4xl w-full flex flex-col md:flex-row gap-8">
                 {/* Left Panel: Image Upload & Preview */}
                 <div className="flex-1 flex flex-col items-center justify-center p-4">
-                    <h2 className="text-3xl font-bold mb-6 text-white text-center">ইমেজ টাইটেল ও কিওয়ার্ড জেনারেটর</h2>
+                    <h2 className="text-3xl font-bold mb-6 text-white text-center">Image Title & Keyword Generator</h2>
                     <div className="w-full h-64 border-2 border-dashed border-gray-300 border-opacity-50 rounded-lg flex items-center justify-center relative overflow-hidden bg-gray-700 bg-opacity-30 mb-6">
                         {previewUrl ? (
                             <img src={previewUrl} alt="Preview" className="max-h-full max-w-full object-contain rounded-lg" />
                         ) : (
-                            <span className="text-gray-300 text-lg">এখানে ছবি আপলোড করুন</span>
+                            <span className="text-gray-300 text-lg">Upload Image Here</span>
                         )}
                         <input
                             type="file"
@@ -304,35 +346,35 @@ function App() {
                         className="w-full bg-gradient-to-r from-teal-400 to-blue-500 hover:from-teal-500 hover:to-blue-600 text-white font-bold py-3 px-6 rounded-lg shadow-lg transform transition-all duration-300 hover:scale-105 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:ring-opacity-75 mb-4"
                         disabled={loading || !image}
                     >
-                        {loading ? 'জেনারেট হচ্ছে...' : 'টাইটেল ও কিওয়ার্ড জেনারেট করুন'}
+                        {loading ? 'Generating...' : 'Generate Title & Keywords'}
                     </button>
                     {error && (
                         <p className="text-red-300 text-sm mt-2 text-center">{error}</p>
                     )}
                     {userId && (
-                        <p className="text-gray-300 text-xs mt-4 break-all">ইউজার আইডি: {userId}</p>
+                        <p className="text-gray-300 text-xs mt-4 break-all">User ID: {userId}</p>
                     )}
                 </div>
 
                 {/* Right Panel: Output */}
                 <div className="flex-1 flex flex-col p-4">
-                    <h3 className="text-2xl font-bold mb-4 text-white">জেনারেট করা ফলাফল</h3>
+                    <h3 className="text-2xl font-bold mb-4 text-white">Generated Results</h3>
 
                     {/* Title Output */}
                     <div className="mb-6">
-                        <label className="block text-gray-300 text-sm font-bold mb-2">টাইটেল:</label>
+                        <label className="block text-gray-300 text-sm font-bold mb-2">Title:</label>
                         <div className="relative">
                             <textarea
                                 readOnly
                                 value={title}
                                 className="w-full p-3 pr-12 rounded-lg bg-gray-800 bg-opacity-50 border border-gray-600 text-white focus:outline-none focus:border-purple-400 resize-none h-24 scrollbar-thin scrollbar-thumb-purple-400 scrollbar-track-gray-700"
-                                placeholder="এখানে জেনারেট করা টাইটেল প্রদর্শিত হবে..."
+                                placeholder="Generated title will appear here..."
                             ></textarea>
                             {title && (
                                 <button
-                                    onClick={() => copyToClipboard(title, 'টাইটেল')}
+                                    onClick={() => copyToClipboard(title, 'Title')}
                                     className="absolute top-2 right-2 bg-purple-600 hover:bg-purple-700 text-white p-2 rounded-full focus:outline-none focus:ring-2 focus:ring-purple-400 focus:ring-opacity-75 transition-colors duration-200"
-                                    aria-label="কপি টাইটেল"
+                                    aria-label="Copy Title"
                                 >
                                     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 5H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-2M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v2M8 5h2v2h-2V5z"></path>
@@ -344,7 +386,7 @@ function App() {
 
                     {/* Keywords Output */}
                     <div>
-                        <label className="block text-gray-300 text-sm font-bold mb-2">কিওয়ার্ডস (মোট {keywords.length}টি):</label>
+                        <label className="block text-gray-300 text-sm font-bold mb-2">Keywords (Total {keywords.length}):</label>
                         <div className="relative">
                             <div className="w-full min-h-[100px] p-3 pr-12 rounded-lg bg-gray-800 bg-opacity-50 border border-gray-600 text-white focus:outline-none focus:border-purple-400 flex flex-wrap gap-2 overflow-y-auto scrollbar-thin scrollbar-thumb-purple-400 scrollbar-track-gray-700 max-h-48">
                                 {keywords.length > 0 ? (
@@ -354,14 +396,14 @@ function App() {
                                         </span>
                                     ))
                                 ) : (
-                                    <span className="text-gray-400">এখানে জেনারেট করা কিওয়ার্ড প্রদর্শিত হবে...</span>
+                                    <span className="text-gray-400">Generated keywords will appear here...</span>
                                 )}
                             </div>
                             {keywords.length > 0 && (
                                 <button
-                                    onClick={() => copyToClipboard(keywords.join(', '), 'কিওয়ার্ডস')}
+                                    onClick={() => copyToClipboard(keywords.join(', '), 'Keywords')}
                                     className="absolute top-2 right-2 bg-purple-600 hover:bg-purple-700 text-white p-2 rounded-full focus:outline-none focus:ring-2 focus:ring-purple-400 focus:ring-opacity-75 transition-colors duration-200"
-                                    aria-label="কপি কিওয়ার্ডস"
+                                    aria-label="Copy Keywords"
                                 >
                                     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 5H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-2M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v2M8 5h2v2h-2V5z"></path>
@@ -371,6 +413,24 @@ function App() {
                         </div>
                     </div>
                 </div>
+            </div>
+            {/* About Me Section */}
+            <div className="mt-8 p-6 bg-white bg-opacity-10 backdrop-filter backdrop-blur-lg border border-opacity-20 border-white rounded-xl shadow-2xl text-center flex flex-col items-center">
+                <h3 className="text-xl font-bold mb-4 text-white">About Me</h3>
+                <img
+                    src="https://i.imgur.com/Koo6due.jpeg" // Your actual photo URL from Imgur
+                    alt="SHAHADAT HOSSAIN BAPPI's Photo"
+                    className="w-24 h-24 rounded-full border-2 border-purple-400 shadow-lg mb-4"
+                />
+                <p className="text-gray-200 text-lg">
+                    This tool was created by: <span className="font-semibold text-white">SHAHADAT HOSSAIN BAPPI</span>
+                </p>
+                <p className="text-gray-300 text-sm mt-2">
+                    It helps generate titles and keywords for images using AI.
+                </p>
+                <p className="text-gray-300 text-sm mt-2">
+                    Feel free to explore and leverage the power of artificial intelligence!
+                </p>
             </div>
         </div>
     );
