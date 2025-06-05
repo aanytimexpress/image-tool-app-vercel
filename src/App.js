@@ -10,35 +10,43 @@ import { getFirestore, doc, setDoc } from 'firebase/firestore';
 // 3. Default or empty values (if none are available)
 
 const getFirebaseConfig = () => {
+    let config = {};
     // Prioritize Canvas global variables
     if (typeof window !== 'undefined' && typeof window.__firebase_config !== 'undefined') {
         try {
-            return JSON.parse(window.__firebase_config);
+            config = JSON.parse(window.__firebase_config);
         } catch (e) {
             console.error("Failed to parse window.__firebase_config:", e);
         }
     }
     // Fallback to process.env variables (for Vercel or local build)
-    if (typeof process !== 'undefined' && typeof process.env !== 'undefined' && process.env.REACT_APP_FIREBASE_CONFIG) {
+    else if (typeof process !== 'undefined' && typeof process.env !== 'undefined' && process.env.REACT_APP_FIREBASE_CONFIG) {
         try {
-            return JSON.parse(process.env.REACT_APP_FIREBASE_CONFIG);
+            config = JSON.parse(process.env.REACT_APP_FIREBASE_CONFIG);
         } catch (e) {
             console.error("Failed to parse process.env.REACT_APP_FIREBASE_CONFIG:", e);
         }
     }
-    return {}; // Return empty object if no configuration is found
+
+    // Validate if the config object has essential Firebase properties
+    if (config && config.apiKey && config.projectId && config.appId) {
+        return config;
+    }
+    console.error("Firebase config is incomplete or invalid:", config);
+    return {}; // Return empty object if no valid configuration is found
 };
 
 const firebaseConfig = getFirebaseConfig();
-const app = Object.keys(firebaseConfig).length ? initializeApp(firebaseConfig) : null;
+// Check if firebaseConfig is a non-empty object to avoid initializing with an empty config
+const app = Object.keys(firebaseConfig).length > 0 ? initializeApp(firebaseConfig) : null;
 const auth = app ? getAuth(app) : null;
 const db = app ? getFirestore(app) : null;
 
 // Logging for debugging purposes - এই লাইনগুলো Vercel-এ ডিপ্লয় হওয়ার পর কনসোলে তথ্য দেখাবে
 console.log("DEBUG: Initial Firebase Config ->", firebaseConfig);
-console.log("DEBUG: Firebase App Instance ->", app);
-console.log("DEBUG: Firebase Auth Instance ->", auth);
-console.log("DEBUG: Firebase Firestore Instance ->", db);
+console.log("DEBUG: Firebase App Instance ->", app); // Should not be null if config is valid
+console.log("DEBUG: Firebase Auth Instance ->", auth); // Should not be null if app is valid
+console.log("DEBUG: Firebase Firestore Instance ->", db); // Should not be null if app is valid
 
 
 // Function to get the app ID
@@ -72,7 +80,7 @@ const getGeminiApiKey = () => {
     if (typeof process !== 'undefined' && typeof process.env !== 'undefined' && process.env.REACT_APP_GEMINI_API_KEY) {
         return process.env.REACT_APP_GEMINI_API_KEY;
     }
-    return "";
+    return ""; // Default empty string, will be auto-populated in Canvas
 };
 console.log("DEBUG: Gemini API Key (from getGeminiApiKey) ->", getGeminiApiKey());
 
@@ -91,8 +99,8 @@ function App() {
 
     useEffect(() => {
         if (!auth) {
-            console.error("Firebase Auth instance is not available. Please check Firebase config.");
-            setError("Application initialization failed.");
+            console.error("Firebase Auth instance is not available. Please check Firebase config and ensure `app` is initialized.");
+            setError("Application initialization failed. Please check Firebase configuration.");
             return;
         }
 
@@ -107,7 +115,7 @@ function App() {
                     }
                 } catch (err) {
                     console.error("Firebase authentication error during sign-in:", err);
-                    setError("Firebase authentication failed.");
+                    setError("Firebase authentication failed. Please check your network and Firebase rules.");
                 }
             }
             // Set the user ID; UID if authenticated, otherwise a random ID
@@ -209,8 +217,8 @@ function App() {
         };
 
         const geminiApiKey = getGeminiApiKey();
-        if (!geminiApiKey) { // Simplified check for API key
-            setError("Gemini API Key is not available. Please set Vercel environment variables.");
+        if (!geminiApiKey) { // Check if API key is truly available
+            setError("Gemini API Key is not available. Please set Vercel environment variable REACT_APP_GEMINI_API_KEY.");
             setLoading(false);
             return;
         }
@@ -218,7 +226,6 @@ function App() {
 
 
         try {
-            // Call Gemini API
             const response = await fetch(apiUrl, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -247,7 +254,7 @@ function App() {
                 });
 
             } else {
-                setError('Generation failed. Please try again.');
+                setError('Generation failed. Unexpected API response. Please try again.');
                 console.error("Unexpected API response structure:", result);
             }
         } catch (err) {
