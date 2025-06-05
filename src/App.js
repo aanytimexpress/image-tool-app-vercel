@@ -3,88 +3,39 @@ import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged }
 import { initializeApp } from 'firebase/app';
 import { getFirestore, doc, setDoc } from 'firebase/firestore';
 
-// --- Firebase & API Key Configuration ---
-// These functions ensure that Firebase configuration and API Key are loaded from the correct source:
-// 1. Canvas global variables (when running in Canvas environment)
-// 2. process.env variables (when running in Vercel or local build environment)
-// 3. Default or empty values (if none are available)
+// --- WARNING: TEMPORARY HARDCODING FOR DEBUGGING PURPOSES ONLY ---
+// DO NOT USE HARDCODED API KEYS OR FIREBASE CONFIG IN PRODUCTION
+// This is done to bypass environment variable parsing issues and diagnose Firebase initialization.
 
-const getFirebaseConfig = () => {
-    let config = {};
-    // Prioritize Canvas global variables
-    if (typeof window !== 'undefined' && typeof window.__firebase_config !== 'undefined') {
-        try {
-            config = JSON.parse(window.__firebase_config);
-        } catch (e) {
-            console.error("Failed to parse window.__firebase_config:", e);
-        }
-    }
-    // Fallback to process.env variables (for Vercel or local build)
-    else if (typeof process !== 'undefined' && typeof process.env !== 'undefined' && process.env.REACT_APP_FIREBASE_CONFIG) {
-        try {
-            config = JSON.parse(process.env.REACT_APP_FIREBASE_CONFIG);
-        } catch (e) {
-            console.error("Failed to parse process.env.REACT_APP_FIREBASE_CONFIG:", e);
-        }
-    }
-
-    // Validate if the config object has essential Firebase properties
-    if (config && config.apiKey && config.projectId && config.appId) {
-        return config;
-    }
-    console.error("Firebase config is incomplete or invalid:", config);
-    return {}; // Return empty object if no valid configuration is found
+const HARDCODED_FIREBASE_CONFIG = {
+    apiKey: "AIzaSyAv3w8ERktKMu6UB3mDctWoPkhoqTPfVhc",
+    authDomain: "myimagetoolapp.firebaseapp.com",
+    projectId: "myimagetoolapp",
+    storageBucket: "myimagetoolapp.firebasestorage.app",
+    messagingSenderId: "13925896046",
+    appId: "1:13925896046:web:e31386f3dff78a6b487b7f",
+    measurementId: "G-49SP3ZTB79"
 };
 
-const firebaseConfig = getFirebaseConfig();
-// Check if firebaseConfig is a non-empty object to avoid initializing with an empty config
-const app = Object.keys(firebaseConfig).length > 0 ? initializeApp(firebaseConfig) : null;
-const auth = app ? getAuth(app) : null;
-const db = app ? getFirestore(app) : null;
+// IMPORTANT: Replace "YOUR_GEMINI_API_KEY_HERE" with your actual Gemini API Key
+const HARDCODED_GEMINI_API_KEY = "AIzaSyBlTC2lpojtjjr05JL8sptar__hDeaS_B4"; // <-- Ekhane tomar asli Gemini API Key paste koro
+
+const app = initializeApp(HARDCODED_FIREBASE_CONFIG);
+const auth = getAuth(app);
+const db = getFirestore(app);
 
 // Logging for debugging purposes - এই লাইনগুলো Vercel-এ ডিপ্লয় হওয়ার পর কনসোলে তথ্য দেখাবে
-console.log("DEBUG: Initial Firebase Config ->", firebaseConfig);
+console.log("DEBUG: Initial Firebase Config (Hardcoded) ->", HARDCODED_FIREBASE_CONFIG);
 console.log("DEBUG: Firebase App Instance ->", app); // Should not be null if config is valid
 console.log("DEBUG: Firebase Auth Instance ->", auth); // Should not be null if app is valid
 console.log("DEBUG: Firebase Firestore Instance ->", db); // Should not be null if app is valid
+console.log("DEBUG: Gemini API Key (Hardcoded) ->", HARDCODED_GEMINI_API_KEY);
 
+// Default values for app ID and auth token, as they are not critical for this specific debug
+const getAppId = () => 'default-app-id-hardcoded';
+const getAuthToken = () => null;
 
-// Function to get the app ID
-const getAppId = () => {
-    if (typeof window !== 'undefined' && typeof window.__app_id !== 'undefined') {
-        return window.__app_id;
-    }
-    if (typeof process !== 'undefined' && typeof process.env !== 'undefined' && process.env.REACT_APP_APP_ID) {
-        return process.env.REACT_APP_APP_ID;
-    }
-    return 'default-app-id';
-};
-console.log("DEBUG: App ID (from getAppId) ->", getAppId());
-
-
-// Function to get the authentication token
-const getAuthToken = () => {
-    if (typeof window !== 'undefined' && typeof window.__initial_auth_token !== 'undefined') {
-        return window.__initial_auth_token;
-    }
-    if (typeof process !== 'undefined' && typeof process.env !== 'undefined' && process.env.REACT_APP_INITIAL_AUTH_TOKEN) {
-        return process.env.REACT_APP_INITIAL_AUTH_TOKEN;
-    }
-    return null;
-};
-console.log("DEBUG: Auth Token (from getAuthToken) ->", getAuthToken());
-
-
-// Function to get the Gemini API Key
-const getGeminiApiKey = () => {
-    if (typeof process !== 'undefined' && typeof process.env !== 'undefined' && process.env.REACT_APP_GEMINI_API_KEY) {
-        return process.env.REACT_APP_GEMINI_API_KEY;
-    }
-    return ""; // Default empty string, will be auto-populated in Canvas
-};
-console.log("DEBUG: Gemini API Key (from getGeminiApiKey) ->", getGeminiApiKey());
-
-// --- Firebase & API Key Configuration End ---
+// --- END TEMPORARY HARDCODING ---
 
 
 function App() {
@@ -94,36 +45,34 @@ function App() {
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
     const [previewUrl, setPreviewUrl] = useState(null);
-    const [userId, setUserId] = useState(null);
+    const [userId, setUserId] = useState(null); // userId will be set after auth is ready
     const [isAuthReady, setIsAuthReady] = useState(false);
 
     useEffect(() => {
         if (!auth) {
-            console.error("Firebase Auth instance is not available. Please check Firebase config and ensure `app` is initialized.");
-            setError("Application initialization failed. Please check Firebase configuration.");
+            console.error("Firebase Auth instance is not available. This should not happen with hardcoded config.");
+            setError("Application initialization failed. Firebase Auth is not available.");
             return;
         }
 
         const unsubscribe = onAuthStateChanged(auth, async (user) => {
             if (!user) { // If no user is logged in
                 try {
-                    const token = getAuthToken();
-                    if (token) { // If a real token exists (not a mock token)
+                    const token = getAuthToken(); // This will be null for hardcoded path
+                    if (token) {
                         await signInWithCustomToken(auth, token);
-                    } else { // Fallback to anonymous sign-in for local development or if no real token
-                        await signInAnonymously(auth);
+                    } else {
+                        await signInAnonymously(auth); // Sign in anonymously
                     }
                 } catch (err) {
                     console.error("Firebase authentication error during sign-in:", err);
-                    setError("Firebase authentication failed. Please check your network and Firebase rules.");
+                    setError("Firebase authentication failed. Please check network and Firebase rules (Anonymous sign-in).");
                 }
             }
-            // Set the user ID; UID if authenticated, otherwise a random ID
             setUserId(auth.currentUser?.uid || crypto.randomUUID());
-            setIsAuthReady(true); // Indicate that authentication process is complete
+            setIsAuthReady(true);
         });
 
-        // Clean up the subscription on component unmount
         return () => unsubscribe();
     }, [auth]);
 
@@ -131,14 +80,12 @@ function App() {
     const handleImageChange = (e) => {
         const file = e.target.files[0];
         if (file) {
-            // Check image type
             if (!file.type.startsWith('image/')) {
                 setError('Please upload image files only.');
                 setImage(null);
                 setPreviewUrl(null);
                 return;
             }
-            // Check image size (max 5MB)
             if (file.size > 5 * 1024 * 1024) { // 5MB limit
                 setError('Image size cannot exceed 5MB.');
                 setImage(null);
@@ -146,13 +93,13 @@ function App() {
                 return;
             }
 
-            setError(''); // Clear any errors
-            const reader = new FileReader(); // Use FileReader to read the image
+            setError('');
+            const reader = new FileReader();
             reader.onloadend = () => {
-                setImage(reader.result); // Set image as Base64 string
-                setPreviewUrl(reader.result); // Set URL for preview display
+                setImage(reader.result);
+                setPreviewUrl(reader.result);
             };
-            reader.readAsDataURL(file); // Read image as Base64 Data URL
+            reader.readAsDataURL(file);
         } else {
             setImage(null);
             setPreviewUrl(null);
@@ -160,31 +107,26 @@ function App() {
     };
 
     const handleGenerate = async () => {
-        // Cannot generate if no image is uploaded
         if (!image) {
             setError('Please upload an image.');
             return;
         }
-        // Wait if Firebase Auth and Firestore are not ready
         if (!isAuthReady || !userId || !db) {
             setError('Application is preparing, please wait a moment.');
             console.warn("Firestore not ready or userId not set. isAuthReady:", isAuthReady, "userId:", userId, "db:", db);
             return;
         }
 
-        setLoading(true); // Set loading state
-        setError(''); // Clear error message
-        setTitle(''); // Clear previous title
-        setKeywords([]); // Clear previous keywords
+        setLoading(true);
+        setError('');
+        setTitle('');
+        setKeywords([]);
 
-        // Separate image MIME type and Base64 data
         const imageMimeType = image.substring(image.indexOf(':') + 1, image.indexOf(';'));
-        const base64ImageData = image.split(',')[1]; // Remove "data:image/jpeg;base64," prefix
+        const base64ImageData = image.split(',')[1];
 
-        // Create prompt for Gemini API
         const prompt = `Based on this image, generate a trendy, appealing title following general Adobe Stock guidelines (e.g., descriptive, unique, marketable). Also, provide approximately 45 single-word keywords highly relevant to the image content. Ensure keywords are distinct and represent key elements, concepts, and styles present in the image. Use only single words.`;
 
-        // Create payload for API call
         const payload = {
             contents: [
                 {
@@ -216,14 +158,13 @@ function App() {
             }
         };
 
-        const geminiApiKey = getGeminiApiKey();
-        if (!geminiApiKey) { // Check if API key is truly available
-            setError("Gemini API Key is not available. Please set Vercel environment variable REACT_APP_GEMINI_API_KEY.");
+        const geminiApiKey = HARDCODED_GEMINI_API_KEY; // Use hardcoded API key
+        if (!geminiApiKey || geminiApiKey === "YOUR_GEMINI_API_KEY_HERE") {
+            setError("Gemini API Key is not set or is a placeholder. Please update App.js with your actual key.");
             setLoading(false);
             return;
         }
         const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${geminiApiKey}`;
-
 
         try {
             const response = await fetch(apiUrl, {
@@ -242,7 +183,6 @@ function App() {
                 setTitle(parsedJson.title || '');
                 setKeywords(Array.isArray(parsedJson.keywords) ? parsedJson.keywords : []);
 
-                // Store generated data in Firestore
                 const appId = getAppId();
                 const userDocRef = doc(db, `artifacts/${appId}/users/${userId}/generated_data`, `data_${Date.now()}`);
                 await setDoc(userDocRef, {
