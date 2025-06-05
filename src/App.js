@@ -315,7 +315,12 @@ function App() {
     return (
         <div className="min-h-screen bg-gradient-to-br from-indigo-500 via-purple-500 to-pink-500 font-inter text-gray-100 flex items-center justify-center p-4">
             {/* Welcome Message Section */}
-            <div className="mb-8 w-full max-w-4xl text-center">
+            <div className="mb-8 w-full max-w-4xl text-center flex flex-col items-center"> {/* Added flex and items-center */}
+                <img
+                    src="https://i.imgur.com/Koo6due.jpeg" // Your actual photo URL from Imgur
+                    alt="SHAHADAT HOSSAIN BAPPI's Photo"
+                    className="w-32 h-32 rounded-full border-4 border-purple-400 shadow-lg mb-4" // Increased size and border
+                />
                 <h1 className="text-4xl font-bold text-white drop-shadow-lg animate-fade-in-down">
                     SHAHADAT HOSSAIN BAPPI welcomes you!
                 </h1>
@@ -413,24 +418,6 @@ function App() {
                         </div>
                     </div>
                 </div>
-            </div>
-            {/* About Me Section */}
-            <div className="mt-8 p-6 bg-white bg-opacity-10 backdrop-filter backdrop-blur-lg border border-opacity-20 border-white rounded-xl shadow-2xl text-center flex flex-col items-center">
-                <h3 className="text-xl font-bold mb-4 text-white">About Me</h3>
-                <img
-                    src="https://i.imgur.com/Koo6due.jpeg" // Your actual photo URL from Imgur
-                    alt="SHAHADAT HOSSAIN BAPPI's Photo"
-                    className="w-24 h-24 rounded-full border-2 border-purple-400 shadow-lg mb-4"
-                />
-                <p className="text-gray-200 text-lg">
-                    This tool was created by: <span className="font-semibold text-white">SHAHADAT HOSSAIN BAPPI</span>
-                </p>
-                <p className="text-gray-300 text-sm mt-2">
-                    It helps generate titles and keywords for images using AI.
-                </p>
-                <p className="text-gray-300 text-sm mt-2">
-                    Feel free to explore and leverage the power of artificial intelligence!
-                </p>
             </div>
         </div>
     );
