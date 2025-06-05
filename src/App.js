@@ -17,8 +17,8 @@ const HARDCODED_FIREBASE_CONFIG = {
     measurementId: "G-49SP3ZTB79"
 };
 
-// IMPORTANT: Replace "AIzaSyBlTC2lpojtjjr05JL8sptar__hDeaS_B4" with your actual Gemini API Key
-const HARDCODED_GEMINI_API_KEY = "AIzaSyBlTC2lpojtjjr05JL8sptar__hDeaS_B4"; // <-- Ekhane tomar asli Gemini API Key paste koro
+// IMPORTANT: Ensure this is your actual Gemini API Key
+const HARDCODED_GEMINI_API_KEY = "AIzaSyBlTC2lpojtjjr05JL8sptar__hDeaS_B4"; // <-- This should be your actual Gemini API Key
 
 const app = initializeApp(HARDCODED_FIREBASE_CONFIG);
 const auth = getAuth(app);
@@ -159,8 +159,9 @@ function App() {
         };
 
         const geminiApiKey = HARDCODED_GEMINI_API_KEY; // Use hardcoded API key
-        if (!geminiApiKey || geminiApiKey === "AIzaSyBlTC2lpojtjjr05JL8sptar__hDeaS_B4") {
-            setError("Gemini API Key is not set or is a placeholder. Please update App.js with your actual key.");
+        // Removed the check for "YOUR_GEMINI_API_KEY_HERE" as the user has already replaced it
+        if (!geminiApiKey) { 
+            setError("Gemini API Key is not set. Please update App.js with your actual key.");
             setLoading(false);
             return;
         }
