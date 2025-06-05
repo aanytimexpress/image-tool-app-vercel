@@ -17,14 +17,14 @@ const HARDCODED_FIREBASE_CONFIG = {
     measurementId: "G-49SP3ZTB79"
 };
 
-// IMPORTANT: Replace "YOUR_GEMINI_API_KEY_HERE" with your actual Gemini API Key
+// IMPORTANT: Replace "AIzaSyBlTC2lpojtjjr05JL8sptar__hDeaS_B4" with your actual Gemini API Key
 const HARDCODED_GEMINI_API_KEY = "AIzaSyBlTC2lpojtjjr05JL8sptar__hDeaS_B4"; // <-- Ekhane tomar asli Gemini API Key paste koro
 
 const app = initializeApp(HARDCODED_FIREBASE_CONFIG);
 const auth = getAuth(app);
 const db = getFirestore(app);
 
-// Logging for debugging purposes - এই লাইনগুলো Vercel-এ ডিপ্লয় হওয়ার পর কনসোলে তথ্য দেখাবে
+// Logging for debugging purposes - These lines will show info in the console after deploying to Vercel
 console.log("DEBUG: Initial Firebase Config (Hardcoded) ->", HARDCODED_FIREBASE_CONFIG);
 console.log("DEBUG: Firebase App Instance ->", app); // Should not be null if config is valid
 console.log("DEBUG: Firebase Auth Instance ->", auth); // Should not be null if app is valid
@@ -159,7 +159,7 @@ function App() {
         };
 
         const geminiApiKey = HARDCODED_GEMINI_API_KEY; // Use hardcoded API key
-        if (!geminiApiKey || geminiApiKey === "YOUR_GEMINI_API_KEY_HERE") {
+        if (!geminiApiKey || geminiApiKey === "AIzaSyBlTC2lpojtjjr05JL8sptar__hDeaS_B4") {
             setError("Gemini API Key is not set or is a placeholder. Please update App.js with your actual key.");
             setLoading(false);
             return;
@@ -275,10 +275,16 @@ function App() {
                     className="w-32 h-32 rounded-full border-4 border-purple-400 shadow-lg mb-4"
                 />
                 <h1 className="text-4xl font-bold text-white drop-shadow-lg animate-fade-in-down">
-                    SHAHADAT HOSSAIN BAPPI welcomes you!
+                    SHAHADAT HOSSAIN
                 </h1>
-                <p className="text-xl text-gray-200 mt-2 animate-fade-in-up">
-                    Discover the power of AI to elevate your image content.
+                <p className="text-2xl text-purple-200 mt-1 font-semibold animate-fade-in-up">
+                    Senior Graphic Designer
+                </p>
+                <p className="text-xl text-gray-200 mt-1 animate-fade-in-up">
+                    at DesignXpress
+                </p>
+                <p className="text-lg text-gray-300 mt-4 animate-fade-in-up">
+                    Welcome to my AI Powered Image Tool!
                 </p>
             </div>
 
