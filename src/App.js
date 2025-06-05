@@ -34,6 +34,13 @@ const app = Object.keys(firebaseConfig).length ? initializeApp(firebaseConfig) :
 const auth = app ? getAuth(app) : null;
 const db = app ? getFirestore(app) : null;
 
+// Logging for debugging purposes - এই লাইনগুলো Vercel-এ ডিপ্লয় হওয়ার পর কনসোলে তথ্য দেখাবে
+console.log("DEBUG: Initial Firebase Config ->", firebaseConfig);
+console.log("DEBUG: Firebase App Instance ->", app);
+console.log("DEBUG: Firebase Auth Instance ->", auth);
+console.log("DEBUG: Firebase Firestore Instance ->", db);
+
+
 // Function to get the app ID
 const getAppId = () => {
     if (typeof window !== 'undefined' && typeof window.__app_id !== 'undefined') {
@@ -44,6 +51,8 @@ const getAppId = () => {
     }
     return 'default-app-id';
 };
+console.log("DEBUG: App ID (from getAppId) ->", getAppId());
+
 
 // Function to get the authentication token
 const getAuthToken = () => {
@@ -55,16 +64,18 @@ const getAuthToken = () => {
     }
     return null;
 };
+console.log("DEBUG: Auth Token (from getAuthToken) ->", getAuthToken());
+
 
 // Function to get the Gemini API Key
 const getGeminiApiKey = () => {
-    // In the Canvas environment, if the API Key is empty, it's automatically populated.
-    // For Vercel or local builds, it comes from environment variables.
     if (typeof process !== 'undefined' && typeof process.env !== 'undefined' && process.env.REACT_APP_GEMINI_API_KEY) {
         return process.env.REACT_APP_GEMINI_API_KEY;
     }
-    return ""; // Default empty string allows for automatic API Key injection in Canvas
+    return "";
 };
+console.log("DEBUG: Gemini API Key (from getGeminiApiKey) ->", getGeminiApiKey());
+
 // --- Firebase & API Key Configuration End ---
 
 
@@ -106,7 +117,7 @@ function App() {
 
         // Clean up the subscription on component unmount
         return () => unsubscribe();
-    }, [auth]); // 'auth' is a necessary dependency here, as the logic inside useEffect depends on the 'auth' object.
+    }, [auth]);
 
 
     const handleImageChange = (e) => {
@@ -198,8 +209,6 @@ function App() {
         };
 
         const geminiApiKey = getGeminiApiKey();
-        // If API Key is not available in Vercel or local production, it will show an error.
-        // In Canvas, it's automatically populated if empty.
         if (!geminiApiKey) { // Simplified check for API key
             setError("Gemini API Key is not available. Please set Vercel environment variables.");
             setLoading(false);
@@ -217,19 +226,17 @@ function App() {
             });
             const result = await response.json();
 
-            // Process API response
             if (result.candidates && result.candidates.length > 0 &&
                 result.candidates[0].content && result.candidates[0].content.parts &&
                 result.candidates[0].content.parts.length > 0) {
                 const json = result.candidates[0].content.parts[0].text;
                 const parsedJson = JSON.parse(json);
 
-                setTitle(parsedJson.title || ''); // Set title
-                setKeywords(Array.isArray(parsedJson.keywords) ? parsedJson.keywords : []); // Set keywords
+                setTitle(parsedJson.title || '');
+                setKeywords(Array.isArray(parsedJson.keywords) ? parsedJson.keywords : []);
 
-                // Save generated data to Firestore
+                // Store generated data in Firestore
                 const appId = getAppId();
-                // Firestore path for private data: artifacts/{appId}/users/{userId}/{your_collection_name}
                 const userDocRef = doc(db, `artifacts/${appId}/users/${userId}/generated_data`, `data_${Date.now()}`);
                 await setDoc(userDocRef, {
                     timestamp: new Date(),
@@ -247,11 +254,10 @@ function App() {
             setError('An error occurred during generation: ' + err.message);
             console.error("API call error:", err);
         } finally {
-            setLoading(false); // Stop loading state
+            setLoading(false);
         }
     };
 
-    // Function to copy to clipboard
     const copyToClipboard = (text, type) => {
         const tempTextArea = document.createElement('textarea');
         tempTextArea.value = text;
@@ -315,11 +321,11 @@ function App() {
     return (
         <div className="min-h-screen bg-gradient-to-br from-indigo-500 via-purple-500 to-pink-500 font-inter text-gray-100 flex items-center justify-center p-4">
             {/* Welcome Message Section */}
-            <div className="mb-8 w-full max-w-4xl text-center flex flex-col items-center"> {/* Added flex and items-center */}
+            <div className="mb-8 w-full max-w-4xl text-center flex flex-col items-center">
                 <img
-                    src="https://i.imgur.com/Koo6due.jpeg" // Your actual photo URL from Imgur
+                    src="https://i.imgur.com/Koo6due.jpeg"
                     alt="SHAHADAT HOSSAIN BAPPI's Photo"
-                    className="w-32 h-32 rounded-full border-4 border-purple-400 shadow-lg mb-4" // Increased size and border
+                    className="w-32 h-32 rounded-full border-4 border-purple-400 shadow-lg mb-4"
                 />
                 <h1 className="text-4xl font-bold text-white drop-shadow-lg animate-fade-in-down">
                     SHAHADAT HOSSAIN BAPPI welcomes you!
