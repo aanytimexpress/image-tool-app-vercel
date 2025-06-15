@@ -17,19 +17,12 @@ const HARDCODED_FIREBASE_CONFIG = {
     measurementId: "G-49SP3ZTB79"
 };
 
-// IMPORTANT: Ensure this is your actual Gemini API Key
-const HARDCODED_GEMINI_API_KEY = "AIzaSyBlTC2lpojtjjr05JL8sptar__hDeaS_B4"; // <-- This should be your actual Gemini API Key
+// IMPORTANT: This should be your actual Gemini API Key
+const HARDCODED_GEMINI_API_KEY = "AIzaSyBlTC2lpojtjjr05JL8sptar__hDeaS_B4"; // Your actual Gemini API Key here
 
 const app = initializeApp(HARDCODED_FIREBASE_CONFIG);
 const auth = getAuth(app);
 const db = getFirestore(app);
-
-// Logging for debugging purposes - These lines will show info in the console after deploying to Vercel
-console.log("DEBUG: Initial Firebase Config (Hardcoded) ->", HARDCODED_FIREBASE_CONFIG);
-console.log("DEBUG: Firebase App Instance ->", app); // Should not be null if config is valid
-console.log("DEBUG: Firebase Auth Instance ->", auth); // Should not be null if app is valid
-console.log("DEBUG: Firebase Firestore Instance ->", db); // Should not be null if app is valid
-console.log("DEBUG: Gemini API Key (Hardcoded) ->", HARDCODED_GEMINI_API_KEY);
 
 // Default values for app ID and auth token, as they are not critical for this specific debug
 const getAppId = () => 'default-app-id-hardcoded';
@@ -125,7 +118,7 @@ function App() {
         const imageMimeType = image.substring(image.indexOf(':') + 1, image.indexOf(';'));
         const base64ImageData = image.split(',')[1];
 
-        const prompt = `Based on this image, generate a trendy, appealing title following general Adobe Stock guidelines (e.g., descriptive, unique, marketable). Also, provide approximately 45 single-word keywords highly relevant to the image content. Ensure keywords are distinct and represent key elements, concepts, and styles present in the image. Use only single words.`;
+        const prompt = `Analyze the uploaded image, which is a user interface design wireframe or layout. Generate a trendy, appealing title suitable for Adobe Stock, focusing on its nature as a 'wireframe,' 'template,' or 'layout' for a 'landing page' or 'website.' Emphasize design concepts over specific app types. Also, provide approximately 45 single-word keywords highly relevant to the visual content and its purpose as a digital design asset, including terms like 'wireframe', 'layout', 'template', 'UI', 'UX', 'web', 'mobile', 'design', 'landing page', 'prototype', 'mockup', 'page', 'screen', 'interface', 'user experience', 'user interface', 'digital', 'graphic', 'empty', 'blank', 'modern', 'minimalist', 'clean', 'simple', 'responsive', 'development', 'framework', 'blueprint', 'scheme', 'flowchart', 'creative', 'professional'. Ensure keywords are distinct and represent key elements, concepts, and styles.`;
 
         const payload = {
             contents: [
@@ -159,7 +152,6 @@ function App() {
         };
 
         const geminiApiKey = HARDCODED_GEMINI_API_KEY; // Use hardcoded API key
-        // Removed the check for "YOUR_GEMINI_API_KEY_HERE" as the user has already replaced it
         if (!geminiApiKey) { 
             setError("Gemini API Key is not set. Please update App.js with your actual key.");
             setLoading(false);
